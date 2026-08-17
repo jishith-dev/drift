@@ -1,0 +1,8 @@
+{
+  "name": "drift",
+  "version": "1.0.0",
+  "author": "Jishith-dev",
+  "repo": "https://github.com/Jishith-dev/drift",
+  "description": "A lightweight HTTP web framework for Zen with routing, path parameters, query parsing, static files, request handling, and 404 responses.",
+  "bin": "main.zen"
+}

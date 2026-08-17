@@ -1,0 +1,173 @@
+/*
+* Express.zen v1.0.0
+* A lightweight Express-style HTTP framework for Zen.
+* Provides routing, request/response handling, path parameters,
+* query parsing, static file serving, MIME detection, and 404 handling.
+* v1.0.0 marks the initial stable implementation.
+* author Jishith M P
+*/
+
+struct Request {
+  HttpRequest raw,
+  string path,
+  string method,
+  Map query,
+  Map params
+}
+
+struct App {
+  Request req,
+  bool handled
+
+  get(string pattern, fn handler(Request) void) void {
+    if (this.handled) { return }
+    if (this.req.raw.method != "GET") { return }
+    Map params
+    if (matchPath(pattern, this.req.path, params)) {
+      this.req.params = params
+      handler(this.req)
+      this.handled = true
+    }
+  }
+
+  post(string pattern, fn handler(Request) void) void {
+    if (this.handled) { return }
+    if (this.req.raw.method != "POST") { return }
+    Map params
+    if (matchPath(pattern, this.req.path, params)) {
+      this.req.params = params
+      handler(this.req)
+      this.handled = true
+    }
+  }
+
+  put(string pattern, fn handler(Request) void) void {
+    if (this.handled) { return }
+    if (this.req.raw.method != "PUT") { return }
+    Map params
+    if (matchPath(pattern, this.req.path, params)) {
+      this.req.params = params
+      handler(this.req)
+      this.handled = true
+    }
+  }
+
+  del(string pattern, fn handler(Request) void) void {
+    if (this.handled) { return }
+    if (this.req.raw.method != "DELETE") { return }
+    Map params
+    if (matchPath(pattern, this.req.path, params)) {
+      this.req.params = params
+      handler(this.req)
+      this.handled = true
+    }
+  }
+
+static(string prefix, string dir) void {
+  if (this.handled) { return }
+  string full = "/" + this.req.path
+  if (startsWith(full, prefix)) {
+    string rel = slice(full, length(prefix), length(full))
+    if (length(rel) > 0) {
+      string filePath = dir + "/" + rel
+      if (fs.exists(filePath)) {
+        this.req.raw.sendFile(filePath, mimeFor(extName(filePath)))
+        this.handled = true
+      }
+    }
+  }
+}
+}
+
+fn parseQueryInto(string qs, Map out) void {
+  string rest = qs
+  while (length(rest) > 0) {
+    int amp = indexOf(rest, "&")
+    string pair = amp >= 0 ? slice(rest, 0, amp) : rest
+    int eq = indexOf(pair, "=")
+    if (eq >= 0) {
+      out.setString(slice(pair, 0, eq), slice(pair, eq + 1, length(pair)))
+    }
+    rest = amp >= 0 ? slice(rest, amp + 1, length(rest)) : ""
+  }
+}
+
+fn wrapRequest(HttpRequest raw) Request {
+  string full = raw.path
+  string cleanPath = full
+  Map q
+
+  int qIdx = indexOf(full, "?")
+  if (qIdx >= 0) {
+    cleanPath = slice(full, 0, qIdx)
+    parseQueryInto(slice(full, qIdx + 1, length(full)), q)
+  }
+
+  string norm = startsWith(cleanPath, "/") ? slice(cleanPath, 1, length(cleanPath)) : cleanPath
+  Map p
+  return { raw: raw, path: norm, query: q, params: p }
+}
+
+fn matchPath(string pattern, string path, Map params) bool {
+  string pRest = pattern
+  string aRest = path
+
+  while (true) {
+    bool pEnd = length(pRest) == 0
+    bool aEnd = length(aRest) == 0
+    if (pEnd && aEnd) { return true }
+    if (pEnd || aEnd) { return false }
+
+    int pSlash = indexOf(pRest, "/")
+    int aSlash = indexOf(aRest, "/")
+    string pSeg = pSlash >= 0 ? slice(pRest, 0, pSlash) : pRest
+    string aSeg = aSlash >= 0 ? slice(aRest, 0, aSlash) : aRest
+
+    if (startsWith(pSeg, ":")) {
+      params.setString(slice(pSeg, 1, length(pSeg)), aSeg)
+    } else if (pSeg != aSeg) {
+      return false
+    }
+
+    pRest = pSlash >= 0 ? slice(pRest, pSlash + 1, length(pRest)) : ""
+    aRest = aSlash >= 0 ? slice(aRest, aSlash + 1, length(aRest)) : ""
+    
+  }
+  
+return false
+}
+
+fn mimeFor(string ext) string {
+  if (ext == "html") { return "text/html; charset=UTF-8" }
+  if (ext == "css")  { return "text/css" }
+  if (ext == "js")   { return "application/javascript" }
+  return "application/octet-stream"
+}
+
+fn notFound(Request req) void {
+  req.raw.status(404)
+  req.raw.send(`<!doctype html><html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1></body></html>`)
+}
+
+fn listen(int port, fn routes(App) void) void {
+  HttpServer server = httpServer.create(port)
+  if (server.listen() == 1) {
+    screen(`[${time.time()}] INFO Zen server listening on :${port}`)
+    while (true) {
+      HttpRequest raw = server.next()
+      Request req = wrapRequest(raw)
+      screen(`[${time.time()}] ${raw.method} ${raw.path}`)
+
+      App app
+      app.req = req
+      app.handled = false
+      routes(app)
+
+      if (!app.handled) { notFound(app.req) }
+    }
+  } else {
+    screen(`[${time.time()}] ERROR Failed to start server on :${port}`)
+  }
+}
+
+export(App, Request, listen)
