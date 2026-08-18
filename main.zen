@@ -81,14 +81,26 @@ static(string prefix, string dir) void {
 
 fn parseQueryInto(string qs, Map out) void {
   string rest = qs
+
   while (length(rest) > 0) {
     int amp = indexOf(rest, "&")
     string pair = amp >= 0 ? slice(rest, 0, amp) : rest
+
     int eq = indexOf(pair, "=")
+
     if (eq >= 0) {
-      out.setString(slice(pair, 0, eq), slice(pair, eq + 1, length(pair)))
+      string key = slice(pair, 0, eq)
+      string value = slice(pair, eq + 1, length(pair))
+
+      out.setString(
+        http.urlDecode(key),
+        http.urlDecode(value)
+      )
     }
-    rest = amp >= 0 ? slice(rest, amp + 1, length(rest)) : ""
+
+    rest = amp >= 0
+      ? slice(rest, amp + 1, length(rest))
+      : ""
   }
 }
 
@@ -103,38 +115,65 @@ fn wrapRequest(HttpRequest raw) Request {
     parseQueryInto(slice(full, qIdx + 1, length(full)), q)
   }
 
-  string norm = startsWith(cleanPath, "/") ? slice(cleanPath, 1, length(cleanPath)) : cleanPath
   Map p
-  return { raw: raw, path: norm, query: q, params: p }
+  return { raw: raw, path: cleanPath, method: raw.method, query: q, params: p }
 }
 
 fn matchPath(string pattern, string path, Map params) bool {
-  string pRest = pattern
-  string aRest = path
+  // Root route
+  if (pattern == "/") {
+    return path == "/"
+  }
+
+  // Both must start with /
+  if (!startsWith(pattern, "/") || !startsWith(path, "/")) {
+    return false
+  }
+
+  string pRest = slice(pattern, 1, length(pattern))
+  string aRest = slice(path, 1, length(path))
 
   while (true) {
     bool pEnd = length(pRest) == 0
     bool aEnd = length(aRest) == 0
-    if (pEnd && aEnd) { return true }
-    if (pEnd || aEnd) { return false }
+
+    if (pEnd && aEnd) {
+      return true
+    }
+
+    if (pEnd || aEnd) {
+      return false
+    }
 
     int pSlash = indexOf(pRest, "/")
     int aSlash = indexOf(aRest, "/")
-    string pSeg = pSlash >= 0 ? slice(pRest, 0, pSlash) : pRest
-    string aSeg = aSlash >= 0 ? slice(aRest, 0, aSlash) : aRest
+
+    string pSeg = pSlash >= 0
+      ? slice(pRest, 0, pSlash)
+      : pRest
+
+    string aSeg = aSlash >= 0
+      ? slice(aRest, 0, aSlash)
+      : aRest
 
     if (startsWith(pSeg, ":")) {
-      params.setString(slice(pSeg, 1, length(pSeg)), aSeg)
+      string key = slice(pSeg, 1, length(pSeg))
+      params.setString(key, aSeg)
     } else if (pSeg != aSeg) {
       return false
     }
 
-    pRest = pSlash >= 0 ? slice(pRest, pSlash + 1, length(pRest)) : ""
-    aRest = aSlash >= 0 ? slice(aRest, aSlash + 1, length(aRest)) : ""
-    
-  }
-  
-return false
+    pRest = pSlash >= 0
+      ? slice(pRest, pSlash + 1, length(pRest))
+      : ""
+
+    aRest = aSlash >= 0
+      ? slice(aRest, aSlash + 1, length(aRest))
+      : ""
+     
+ }
+
+ return false
 }
 
 fn mimeFor(string ext) string {

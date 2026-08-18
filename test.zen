@@ -1,0 +1,42 @@
+import (App, Request, listen) from "drift"
+
+fn home(Request req) void {
+  req.raw.send("HOME")
+}
+
+fn users(Request req) void {
+  string id = req.params.getString("id")
+  req.raw.send("USER:" + id)
+}
+
+fn search(Request req) void {
+  string name = req.query.getString("name")
+  req.raw.send("SEARCH:" + name)
+}
+
+fn createUser(Request req) void {
+  req.raw.send("CREATED")
+}
+
+fn updateUser(Request req) void {
+  req.raw.send("UPDATED")
+}
+
+fn deleteUser(Request req) void {
+  req.raw.send("DELETED")
+}
+
+fn routes(App app) void {
+  app.get("/", home)
+  app.get("/users/:id", users)
+  app.get("/search", search)
+
+  app.post("/users", createUser)
+  app.put("/users/:id", updateUser)
+  app.del("/users/:id", deleteUser)
+
+  app.static("/public", "./public")
+}
+
+listen(8080, routes)
+
