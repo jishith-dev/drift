@@ -1,11 +1,19 @@
 /*
-* Express.zen v1.0.0
-* A lightweight Express-style HTTP framework for Zen.
-* Provides routing, request/response handling, path parameters,
-* query parsing, static file serving, MIME detection, and 404 handling.
-* v1.0.0 marks the initial stable implementation.
-* author Jishith M P
-*/
+ * Drift v1.0.0
+ * A lightweight Express-style HTTP framework for Zen.
+ *
+ * Request.path always starts with "/".
+ *
+ * Provides:
+ * - GET, POST, PUT, DELETE routing
+ * - Path parameters
+ * - Query parsing
+ * - Static file serving
+ * - MIME detection
+ * - 404 handling
+ *
+ * author Jishith M P
+ */
 
 struct Request {
   HttpRequest raw,
@@ -15,82 +23,198 @@ struct Request {
   Map params
 }
 
+
 struct App {
   Request req,
   bool handled
 
   get(string pattern, fn handler(Request) void) void {
-    if (this.handled) { return }
-    if (this.req.raw.method != "GET") { return }
+    if (this.handled) {
+      return
+    }
+
+    if (this.req.method != "GET") {
+      return
+    }
+
     Map params
-    if (matchPath(pattern, this.req.path, params)) {
+
+    if (matchPath(
+      pattern,
+      this.req.path,
+      params
+    )) {
       this.req.params = params
       handler(this.req)
       this.handled = true
     }
   }
+
 
   post(string pattern, fn handler(Request) void) void {
-    if (this.handled) { return }
-    if (this.req.raw.method != "POST") { return }
+    if (this.handled) {
+      return
+    }
+
+    if (this.req.method != "POST") {
+      return
+    }
+
     Map params
-    if (matchPath(pattern, this.req.path, params)) {
+
+    if (matchPath(
+      pattern,
+      this.req.path,
+      params
+    )) {
       this.req.params = params
       handler(this.req)
       this.handled = true
     }
   }
+
 
   put(string pattern, fn handler(Request) void) void {
-    if (this.handled) { return }
-    if (this.req.raw.method != "PUT") { return }
+    if (this.handled) {
+      return
+    }
+
+    if (this.req.method != "PUT") {
+      return
+    }
+
     Map params
-    if (matchPath(pattern, this.req.path, params)) {
+
+    if (matchPath(
+      pattern,
+      this.req.path,
+      params
+    )) {
       this.req.params = params
       handler(this.req)
       this.handled = true
     }
   }
+
 
   del(string pattern, fn handler(Request) void) void {
-    if (this.handled) { return }
-    if (this.req.raw.method != "DELETE") { return }
+    if (this.handled) {
+      return
+    }
+
+    if (this.req.method != "DELETE") {
+      return
+    }
+
     Map params
-    if (matchPath(pattern, this.req.path, params)) {
+
+    if (matchPath(
+      pattern,
+      this.req.path,
+      params
+    )) {
       this.req.params = params
       handler(this.req)
       this.handled = true
     }
   }
 
-static(string prefix, string dir) void {
-  if (this.handled) { return }
-  string full = "/" + this.req.path
-  if (startsWith(full, prefix)) {
-    string rel = slice(full, length(prefix), length(full))
-    if (length(rel) > 0) {
-      string filePath = dir + "/" + rel
-      if (fs.exists(filePath)) {
-        this.req.raw.sendFile(filePath, mimeFor(extName(filePath)))
-        this.handled = true
-      }
+
+  static(string prefix, string dir) void {
+    if (this.handled) {
+      return
+    }
+
+    string path = this.req.path
+
+    if (!startsWith(path, prefix)) {
+      return
+    }
+
+    string rel =
+      slice(
+        path,
+        length(prefix),
+        length(path)
+      )
+
+    if (length(rel) == 0) {
+      return
+    }
+
+    /*
+     * Prevent the leading "/" from producing
+     * a double slash in the filesystem path.
+     */
+    if (startsWith(rel, "/")) {
+      rel =
+        slice(
+          rel,
+          1,
+          length(rel)
+        )
+    }
+
+    string filePath =
+      dir + "/" + rel
+
+    if (fs.exists(filePath)) {
+      this.req.raw.sendFile(
+        filePath,
+        mimeFor(extName(filePath))
+      )
+
+      this.handled = true
     }
   }
 }
-}
 
-fn parseQueryInto(string qs, Map out) void {
+
+fn parseQueryInto(
+  string qs,
+  Map out
+) void {
+
   string rest = qs
 
   while (length(rest) > 0) {
-    int amp = indexOf(rest, "&")
-    string pair = amp >= 0 ? slice(rest, 0, amp) : rest
 
-    int eq = indexOf(pair, "=")
+    int amp =
+      indexOf(
+        rest,
+        "&"
+      )
+
+    string pair =
+      amp >= 0
+        ? slice(
+            rest,
+            0,
+            amp
+          )
+        : rest
+
+    int eq =
+      indexOf(
+        pair,
+        "="
+      )
 
     if (eq >= 0) {
-      string key = slice(pair, 0, eq)
-      string value = slice(pair, eq + 1, length(pair))
+
+      string key =
+        slice(
+          pair,
+          0,
+          eq
+        )
+
+      string value =
+        slice(
+          pair,
+          eq + 1,
+          length(pair)
+        )
 
       out.setString(
         http.urlDecode(key),
@@ -98,44 +222,122 @@ fn parseQueryInto(string qs, Map out) void {
       )
     }
 
-    rest = amp >= 0
-      ? slice(rest, amp + 1, length(rest))
-      : ""
+    rest =
+      amp >= 0
+        ? slice(
+            rest,
+            amp + 1,
+            length(rest)
+          )
+        : ""
   }
 }
 
-fn wrapRequest(HttpRequest raw) Request {
-  string full = raw.path
-  string cleanPath = full
+
+fn wrapRequest(
+  HttpRequest raw
+) Request {
+
+  string full =
+    raw.path
+
+  string cleanPath =
+    full
+
   Map q
+  Map p
 
-  int qIdx = indexOf(full, "?")
+  int qIdx =
+    indexOf(
+      full,
+      "?"
+    )
+
   if (qIdx >= 0) {
-    cleanPath = slice(full, 0, qIdx)
-    parseQueryInto(slice(full, qIdx + 1, length(full)), q)
+
+    cleanPath =
+      slice(
+        full,
+        0,
+        qIdx
+      )
+
+    parseQueryInto(
+      slice(
+        full,
+        qIdx + 1,
+        length(full)
+      ),
+      q
+    )
   }
 
-  Map p
-  return { raw: raw, path: cleanPath, method: raw.method, query: q, params: p }
+  /*
+   * Request.path convention:
+   *
+   * "/"           -> "/"
+   * "/users"      -> "/users"
+   * "/users/42"   -> "/users/42"
+   */
+  if (length(cleanPath) == 0) {
+    cleanPath = "/"
+  }
+
+  return {
+    raw: raw,
+    path: cleanPath,
+    method: raw.method,
+    query: q,
+    params: p
+  }
 }
 
-fn matchPath(string pattern, string path, Map params) bool {
-  // Root route
+
+fn matchPath(
+  string pattern,
+  string path,
+  Map params
+) bool {
+
+  /*
+   * Root route.
+   */
   if (pattern == "/") {
     return path == "/"
   }
 
-  // Both must start with /
-  if (!startsWith(pattern, "/") || !startsWith(path, "/")) {
+  /*
+   * Both routes must use the
+   * same leading-slash convention.
+   */
+  if (
+    !startsWith(pattern, "/") ||
+    !startsWith(path, "/")
+  ) {
     return false
   }
 
-  string pRest = slice(pattern, 1, length(pattern))
-  string aRest = slice(path, 1, length(path))
+  string pRest =
+    slice(
+      pattern,
+      1,
+      length(pattern)
+    )
+
+  string aRest =
+    slice(
+      path,
+      1,
+      length(path)
+    )
 
   while (true) {
-    bool pEnd = length(pRest) == 0
-    bool aEnd = length(aRest) == 0
+
+    bool pEnd =
+      length(pRest) == 0
+
+    bool aEnd =
+      length(aRest) == 0
 
     if (pEnd && aEnd) {
       return true
@@ -145,68 +347,170 @@ fn matchPath(string pattern, string path, Map params) bool {
       return false
     }
 
-    int pSlash = indexOf(pRest, "/")
-    int aSlash = indexOf(aRest, "/")
+    int pSlash =
+      indexOf(
+        pRest,
+        "/"
+      )
 
-    string pSeg = pSlash >= 0
-      ? slice(pRest, 0, pSlash)
-      : pRest
+    int aSlash =
+      indexOf(
+        aRest,
+        "/"
+      )
 
-    string aSeg = aSlash >= 0
-      ? slice(aRest, 0, aSlash)
-      : aRest
+    string pSeg =
+      pSlash >= 0
+        ? slice(
+            pRest,
+            0,
+            pSlash
+          )
+        : pRest
+
+    string aSeg =
+      aSlash >= 0
+        ? slice(
+            aRest,
+            0,
+            aSlash
+          )
+        : aRest
 
     if (startsWith(pSeg, ":")) {
-      string key = slice(pSeg, 1, length(pSeg))
-      params.setString(key, aSeg)
+
+      string key =
+        slice(
+          pSeg,
+          1,
+          length(pSeg)
+        )
+
+      params.setString(
+        key,
+        aSeg
+      )
+
     } else if (pSeg != aSeg) {
+
       return false
     }
 
-    pRest = pSlash >= 0
-      ? slice(pRest, pSlash + 1, length(pRest))
-      : ""
+    pRest =
+      pSlash >= 0
+        ? slice(
+            pRest,
+            pSlash + 1,
+            length(pRest)
+          )
+        : ""
 
-    aRest = aSlash >= 0
-      ? slice(aRest, aSlash + 1, length(aRest))
-      : ""
-     
- }
+    aRest =
+      aSlash >= 0
+        ? slice(
+            aRest,
+            aSlash + 1,
+            length(aRest)
+          )
+        : ""
+  }
 
- return false
+  return false
 }
 
-fn mimeFor(string ext) string {
-  if (ext == "html") { return "text/html; charset=UTF-8" }
-  if (ext == "css")  { return "text/css" }
-  if (ext == "js")   { return "application/javascript" }
+
+fn mimeFor(
+  string ext
+) string {
+
+  if (ext == "html") {
+    return "text/html; charset=UTF-8"
+  }
+
+  if (ext == "css") {
+    return "text/css"
+  }
+
+  if (ext == "js") {
+    return "application/javascript"
+  }
+
+  if (ext == "json") {
+    return "application/json"
+  }
+
+  if (ext == "txt") {
+    return "text/plain"
+  }
+
   return "application/octet-stream"
 }
 
-fn notFound(Request req) void {
+
+fn notFound(
+  Request req
+) void {
+
   req.raw.status(404)
-  req.raw.send(`<!doctype html><html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1></body></html>`)
+
+  req.raw.send(
+    `<!doctype html><html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1></body></html>`
+  )
 }
 
-fn listen(int port, fn routes(App) void) void {
-  HttpServer server = httpServer.create(port)
+
+fn listen(
+  int port,
+  fn routes(App) void
+) void {
+
+  HttpServer server =
+    httpServer.create(port)
+
   if (server.listen() == 1) {
-    screen(`[${time.time()}] INFO Zen server listening on :${port}`)
+
+    screen(
+      `[${time.time()}] INFO Zen server listening on :${port}`
+    )
+
     while (true) {
-      HttpRequest raw = server.next()
-      Request req = wrapRequest(raw)
-      screen(`[${time.time()}] ${raw.method} ${raw.path}`)
+
+      HttpRequest raw =
+        server.next()
+
+      Request req =
+        wrapRequest(raw)
+
+      screen(
+        `[${time.time()}] ` +
+        raw.method +
+        " " +
+        raw.path
+      )
 
       App app
+
       app.req = req
       app.handled = false
+
       routes(app)
 
-      if (!app.handled) { notFound(app.req) }
+      if (!app.handled) {
+        notFound(app.req)
+      }
     }
+
   } else {
-    screen(`[${time.time()}] ERROR Failed to start server on :${port}`)
+
+    screen(
+      `[${time.time()}] ERROR Failed to start server on :${port}`
+    )
   }
 }
 
-export(App, Request, listen)
+
+export(
+  App,
+  Request,
+  listen
+)
