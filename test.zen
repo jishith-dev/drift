@@ -1,29 +1,55 @@
-import (App, Request, listen) from "drift"
+import (App, Request, listen) from "lib.zen"
+import (Cors) from "cors"
+
+Cors cors
+cors.setOrigin("https://example.com")
+cors.setMethods("GET, POST, PUT, PATCH, DELETE, OPTIONS")
+cors.setHeaders("Content-Type")
+cors.setExposeHeaders("X-Custom-Header")
+cors.setCredentials(true)
+cors.setMaxAge(3600)
 
 fn home(Request req) void {
+  cors.apply(req.raw)
   req.raw.send("HOME")
 }
 
 fn users(Request req) void {
+  cors.apply(req.raw)
   string id = req.params.getString("id")
   req.raw.send("USER:" + id)
 }
 
 fn search(Request req) void {
+  cors.apply(req.raw)
   string name = req.query.getString("name")
   req.raw.send("SEARCH:" + name)
 }
 
 fn createUser(Request req) void {
+  cors.apply(req.raw)
   req.raw.send("CREATED")
 }
 
 fn updateUser(Request req) void {
+  cors.apply(req.raw)
   req.raw.send("UPDATED")
 }
 
+fn patchUser(Request req) void {
+  cors.apply(req.raw)
+  req.raw.send("PATCHED")
+}
+
 fn deleteUser(Request req) void {
+  cors.apply(req.raw)
   req.raw.send("DELETED")
+}
+
+fn preflight(Request req) void {
+  cors.apply(req.raw)
+  req.raw.status(204)
+  req.raw.send("")
 }
 
 fn routes(App app) void {
@@ -31,12 +57,15 @@ fn routes(App app) void {
   app.get("/users/:id", users)
   app.get("/search", search)
 
+  app.head("/", home)
+
   app.post("/users", createUser)
   app.put("/users/:id", updateUser)
+  app.patch("/users/:id", patchUser)
   app.del("/users/:id", deleteUser)
+  app.options("/users/:id", preflight)
 
   app.static("/public", "./public")
 }
 
 listen(8080, routes)
-

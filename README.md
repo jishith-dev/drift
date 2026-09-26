@@ -1,17 +1,18 @@
 # Drift
 
+Author: Jishith M P
+
 A lightweight, high-level HTTP server library for ZEN.
 
-**Version:** 1.0.0  
-**Author:** Jishith M P
+**Version:** 1.1.0
 
 ## Features
 
 - HTTP routing
-- GET, POST, PUT and DELETE routes
+- GET, HEAD, POST, PUT, PATCH, DELETE and OPTIONS routes
 - Path parameters
 - Query parameters
-- Static file serving
+- Static file serving with path-traversal protection
 - Basic MIME detection
 - Automatic 404 handling
 
@@ -47,17 +48,26 @@ listen(8080, routes)
 #### `app.get(pattern, handler)`
 Registers a GET route.
 
+#### `app.head(pattern, handler)`
+Registers a HEAD route.
+
 #### `app.post(pattern, handler)`
 Registers a POST route.
 
 #### `app.put(pattern, handler)`
 Registers a PUT route.
 
+#### `app.patch(pattern, handler)`
+Registers a PATCH route.
+
 #### `app.del(pattern, handler)`
 Registers a DELETE route.
 
+#### `app.options(pattern, handler)`
+Registers an OPTIONS route.
+
 #### `app.static(prefix, dir)`
-Serves static files from a directory.
+Serves static files from a directory. Only responds to GET/HEAD requests, and rejects any path segment attempting to escape the directory (e.g. `..`).
 
 ### `Request`
 
@@ -173,7 +183,18 @@ Drift currently detects:
 - `.html` → `text/html; charset=UTF-8`
 - `.css` → `text/css`
 - `.js` → `application/javascript`
+- `.json` → `application/json`
+- `.txt` → `text/plain`
+- `.svg` → `image/svg+xml`
+- `.png` → `image/png`
+- `.jpg`, `.jpeg` → `image/jpeg`
+- `.gif` → `image/gif`
+- `.ico` → `image/x-icon`
+- `.woff` → `font/woff`
+- `.woff2` → `font/woff2`
 - other extensions → `application/octet-stream`
+
+Requests using any other HTTP method (e.g. POST) are not served by `static()`.
 
 ## 404 Handling
 

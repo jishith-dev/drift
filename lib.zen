@@ -1,11 +1,11 @@
 /*
- * Drift v1.0.0
+ * Drift v1.1.0
  * A lightweight Express-style HTTP framework for Zen.
  *
  * Request.path always starts with "/".
  *
  * Provides:
- * - GET, POST, PUT, DELETE routing
+ * - GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD routing
  * - Path parameters
  * - Query parsing
  * - Static file serving
@@ -23,10 +23,20 @@ struct Request {
   Map params
 }
 
-
 struct App {
-  Request req,
-  bool handled
+  private Request req
+  private bool handled
+
+  init(Request req) void {
+    this.req = req
+    this.handled = false
+  }
+
+  finish() void {
+    if (!this.handled) {
+      notFound(this.req)
+    }
+  }
 
   get(string pattern, fn handler(Request) void) void {
     if (this.handled) {
@@ -34,6 +44,29 @@ struct App {
     }
 
     if (this.req.method != "GET") {
+      return
+    }
+
+    Map params
+
+    if (matchPath(
+      pattern,
+      this.req.path,
+      params
+    )) {
+      this.req.params = params
+      handler(this.req)
+      this.handled = true
+    }
+  }
+
+
+  head(string pattern, fn handler(Request) void) void {
+    if (this.handled) {
+      return
+    }
+
+    if (this.req.method != "HEAD") {
       return
     }
 
@@ -97,6 +130,29 @@ struct App {
   }
 
 
+  patch(string pattern, fn handler(Request) void) void {
+    if (this.handled) {
+      return
+    }
+
+    if (this.req.method != "PATCH") {
+      return
+    }
+
+    Map params
+
+    if (matchPath(
+      pattern,
+      this.req.path,
+      params
+    )) {
+      this.req.params = params
+      handler(this.req)
+      this.handled = true
+    }
+  }
+
+
   del(string pattern, fn handler(Request) void) void {
     if (this.handled) {
       return
@@ -120,8 +176,38 @@ struct App {
   }
 
 
+  options(string pattern, fn handler(Request) void) void {
+    if (this.handled) {
+      return
+    }
+
+    if (this.req.method != "OPTIONS") {
+      return
+    }
+
+    Map params
+
+    if (matchPath(
+      pattern,
+      this.req.path,
+      params
+    )) {
+      this.req.params = params
+      handler(this.req)
+      this.handled = true
+    }
+  }
+
+
   static(string prefix, string dir) void {
     if (this.handled) {
+      return
+    }
+
+    if (
+      this.req.method != "GET" &&
+      this.req.method != "HEAD"
+    ) {
       return
     }
 
@@ -131,11 +217,31 @@ struct App {
       return
     }
 
+    int prefixLen = length(prefix)
+    int pathLen = length(path)
+
+    /*
+     * Require a "/" (or exact end) right after the prefix,
+     * so "/public" does not also match "/publicXYZ".
+     */
+    if (pathLen > prefixLen) {
+      string boundary =
+        slice(
+          path,
+          prefixLen,
+          prefixLen + 1
+        )
+
+      if (boundary != "/") {
+        return
+      }
+    }
+
     string rel =
       slice(
         path,
-        length(prefix),
-        length(path)
+        prefixLen,
+        pathLen
       )
 
     if (length(rel) == 0) {
@@ -153,6 +259,14 @@ struct App {
           1,
           length(rel)
         )
+    }
+
+    /*
+     * Reject any path segment attempting to escape
+     * the static directory.
+     */
+    if (indexOf(rel, "..") >= 0) {
+      return
     }
 
     string filePath =
@@ -443,6 +557,34 @@ fn mimeFor(
     return "text/plain"
   }
 
+  if (ext == "svg") {
+    return "image/svg+xml"
+  }
+
+  if (ext == "png") {
+    return "image/png"
+  }
+
+  if (ext == "jpg" || ext == "jpeg") {
+    return "image/jpeg"
+  }
+
+  if (ext == "gif") {
+    return "image/gif"
+  }
+
+  if (ext == "ico") {
+    return "image/x-icon"
+  }
+
+  if (ext == "woff") {
+    return "font/woff"
+  }
+
+  if (ext == "woff2") {
+    return "font/woff2"
+  }
+
   return "application/octet-stream"
 }
 
@@ -490,14 +632,11 @@ fn listen(
 
       App app
 
-      app.req = req
-      app.handled = false
+      app.init(req)
 
       routes(app)
 
-      if (!app.handled) {
-        notFound(app.req)
-      }
+      app.finish()
     }
 
   } else {
@@ -514,3 +653,4 @@ export(
   Request,
   listen
 )
+
